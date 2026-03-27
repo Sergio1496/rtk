@@ -155,6 +155,85 @@ fn handle_copilot_cli(cmd: &str) -> Result<()> {
     Ok(())
 }
 
+// ── Claude Code hook (native, no jq/bash required) ──────────
+
+/// Run the Claude Code PreToolUse hook.
+/// Native Rust replacement for rtk-rewrite.sh — works on all platforms including Windows.
+/// Claude Code uses the same JSON format as VS Code Copilot Chat (tool_name + tool_input.command).
+pub fn run_claude() -> Result<()> {
+    let mut input = String::new();
+    io::stdin()
+        .read_to_string(&mut input)
+        .context("Failed to read stdin")?;
+
+    let input = input.trim();
+    if input.is_empty() {
+        return Ok(());
+    }
+
+    let v: Value = match serde_json::from_str(input) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("[rtk hook claude] Failed to parse JSON input: {e}");
+            return Ok(());
+        }
+    };
+
+    // Claude Code sends: { "tool_name": "Bash", "tool_input": { "command": "..." } }
+    let tool_name = match v.get("tool_name").and_then(|t| t.as_str()) {
+        Some(name) => name,
+        None => return Ok(()),
+    };
+
+    if tool_name != "Bash" {
+        return Ok(());
+    }
+
+    let cmd = match v
+        .pointer("/tool_input/command")
+        .and_then(|c| c.as_str())
+        .filter(|c| !c.is_empty())
+    {
+        Some(cmd) => cmd,
+        None => return Ok(()),
+    };
+
+    let rewritten = match get_rewritten(cmd) {
+        Some(r) => r,
+        None => return Ok(()),
+    };
+
+    // Check deny/ask via permissions system
+    let verdict = crate::permissions::check_command(cmd);
+    if verdict == crate::permissions::PermissionVerdict::Deny {
+        return Ok(()); // Let Claude Code's native deny handle it
+    }
+
+    if verdict == crate::permissions::PermissionVerdict::Ask {
+        // Rewrite but don't auto-allow — let Claude Code prompt the user
+        let output = json!({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "updatedInput": { "command": rewritten }
+            }
+        });
+        println!("{output}");
+    } else {
+        // Allow: rewrite and auto-allow
+        let output = json!({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": "RTK auto-rewrite",
+                "updatedInput": { "command": rewritten }
+            }
+        });
+        println!("{output}");
+    }
+
+    Ok(())
+}
+
 // ── Gemini hook ───────────────────────────────────────────────
 
 /// Run the Gemini CLI BeforeTool hook.
@@ -353,5 +432,46 @@ mod tests {
             rewrite_command("RUST_LOG=debug cargo test", &[]),
             Some("RUST_LOG=debug rtk cargo test".into())
         );
+    }
+
+    // --- Claude Code native hook ---
+
+    fn claude_input(cmd: &str) -> Value {
+        json!({
+            "tool_name": "Bash",
+            "tool_input": { "command": cmd }
+        })
+    }
+
+    #[test]
+    fn test_detect_claude_code_bash() {
+        assert!(matches!(
+            detect_format(&claude_input("git status")),
+            HookFormat::VsCode { .. }
+        ));
+    }
+
+    #[test]
+    fn test_detect_claude_code_non_bash_passthrough() {
+        let v = json!({ "tool_name": "Read", "tool_input": { "file_path": "/tmp/foo" } });
+        assert!(matches!(detect_format(&v), HookFormat::PassThrough));
+    }
+
+    #[test]
+    fn test_claude_hook_rewrites_git() {
+        assert_eq!(get_rewritten("git status"), Some("rtk git status".into()));
+    }
+
+    #[test]
+    fn test_claude_hook_rewrites_flutter() {
+        assert_eq!(
+            get_rewritten("flutter test"),
+            Some("rtk flutter test".into())
+        );
+    }
+
+    #[test]
+    fn test_claude_hook_skips_rtk_commands() {
+        assert!(get_rewritten("rtk git status").is_none());
     }
 }

@@ -33,6 +33,12 @@ pub fn status() -> HookStatus {
         return HookStatus::Ok;
     }
 
+    // Check for native hook in settings.json (Windows-friendly, no bash/jq)
+    if native_hook_in_settings(&home) {
+        return HookStatus::Ok;
+    }
+
+    // Check for bash hook file (Unix traditional)
     let Some(hook_path) = hook_installed_path() else {
         return HookStatus::Missing;
     };
@@ -44,6 +50,17 @@ pub fn status() -> HookStatus {
     } else {
         HookStatus::Outdated
     }
+}
+
+/// Check if settings.json contains a native "rtk hook claude" entry.
+fn native_hook_in_settings(home: &std::path::Path) -> bool {
+    let settings_path = home.join(".claude").join("settings.json");
+    let content = match std::fs::read_to_string(&settings_path) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    // Quick substring check — avoids full JSON parse on every command startup
+    content.contains("rtk hook claude")
 }
 
 /// Check if the installed hook is missing or outdated, warn once per day.
@@ -225,32 +242,39 @@ mod tests {
 
     #[test]
     fn test_status_returns_valid_variant() {
+        // Skip on machines without Claude Code
         let home = match dirs::home_dir() {
             Some(h) => h,
             None => return,
         };
-        let s = status();
-        let has_claude_hook = home
+        if !home.join(".claude").exists() {
+            assert_eq!(status(), HookStatus::Ok);
+            return;
+        }
+
+        let has_sh_hook = home
             .join(".claude")
             .join("hooks")
             .join("rtk-rewrite.sh")
             .exists();
-        let has_claude_dir = home.join(".claude").exists();
-        let has_other = other_integration_installed(&home);
+        let has_native_hook = native_hook_in_settings(&home);
 
-        match (has_claude_hook, has_claude_dir, has_other) {
-            (true, _, _) => assert!(
+        let s = status();
+        if has_sh_hook || has_native_hook {
+            assert!(
                 s == HookStatus::Ok || s == HookStatus::Outdated,
-                "Expected Ok or Outdated when Claude hook exists, got {:?}",
+                "Expected Ok or Outdated when hook exists, got {:?}",
                 s
-            ),
-            (false, true, _) => assert_eq!(
-                s,
-                HookStatus::Missing,
-                "Expected Missing when .claude/ exists but hook absent, got {:?}",
-                s
-            ),
-            (false, false, _) => assert_eq!(s, HookStatus::Ok),
+            );
+        } else {
+            assert_eq!(s, HookStatus::Missing);
         }
+    }
+
+    #[test]
+    fn test_native_hook_detection() {
+        // native_hook_in_settings should return false for non-existent paths
+        let fake_home = std::path::Path::new("/nonexistent_path_for_test");
+        assert!(!native_hook_in_settings(fake_home));
     }
 }

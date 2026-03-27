@@ -798,6 +798,95 @@ fn patch_settings_json(
     Ok(PatchResult::Patched)
 }
 
+/// Patch settings.json with a native hook command string (no .sh file needed).
+/// Used on Windows where bash/jq are not available.
+fn patch_settings_json_native(
+    hook_command: &str,
+    mode: PatchMode,
+    verbose: u8,
+    _include_opencode: bool,
+) -> Result<PatchResult> {
+    let claude_dir = resolve_claude_dir()?;
+    let settings_path = claude_dir.join("settings.json");
+
+    // Read or create settings.json
+    let mut root = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path)
+            .with_context(|| format!("Failed to read {}", settings_path.display()))?;
+
+        if content.trim().is_empty() {
+            serde_json::json!({})
+        } else {
+            serde_json::from_str(&content)
+                .with_context(|| format!("Failed to parse {} as JSON", settings_path.display()))?
+        }
+    } else {
+        serde_json::json!({})
+    };
+
+    // Check idempotency
+    if hook_already_present(&root, hook_command) {
+        if verbose > 0 {
+            eprintln!("settings.json: hook already present");
+        }
+        return Ok(PatchResult::AlreadyPresent);
+    }
+
+    // Handle mode
+    match mode {
+        PatchMode::Skip => {
+            println!("\n  MANUAL STEP: Add this to ~/.claude/settings.json:");
+            println!(
+                r#"    {{"hooks": {{"PreToolUse": [{{"matcher": "Bash", "hooks": [{{"type": "command", "command": "{}"}}]}}]}}}}"#,
+                hook_command
+            );
+            return Ok(PatchResult::Skipped);
+        }
+        PatchMode::Ask => {
+            if !prompt_user_consent(&settings_path)? {
+                println!("\n  MANUAL STEP: Add this to ~/.claude/settings.json:");
+                println!(
+                    r#"    {{"hooks": {{"PreToolUse": [{{"matcher": "Bash", "hooks": [{{"type": "command", "command": "{}"}}]}}]}}}}"#,
+                    hook_command
+                );
+                return Ok(PatchResult::Declined);
+            }
+        }
+        PatchMode::Auto => {
+            // Proceed without prompting
+        }
+    }
+
+    // Deep-merge hook
+    insert_hook_entry(&mut root, hook_command);
+
+    // Backup original
+    if settings_path.exists() {
+        let backup_path = settings_path.with_extension("json.bak");
+        fs::copy(&settings_path, &backup_path)
+            .with_context(|| format!("Failed to backup to {}", backup_path.display()))?;
+        if verbose > 0 {
+            eprintln!("Backup: {}", backup_path.display());
+        }
+    }
+
+    // Atomic write
+    let serialized =
+        serde_json::to_string_pretty(&root).context("Failed to serialize settings.json")?;
+    atomic_write(&settings_path, &serialized)?;
+
+    println!("\n  settings.json: hook added (native mode, no jq required)");
+    if settings_path.with_extension("json.bak").exists() {
+        println!(
+            "  Backup: {}",
+            settings_path.with_extension("json.bak").display()
+        );
+    }
+    println!("  Restart Claude Code. Test with: git status");
+
+    Ok(PatchResult::Patched)
+}
+
 /// Clean up consecutive blank lines (collapse 3+ to 2)
 /// Used when removing @RTK.md line from CLAUDE.md
 fn clean_double_blanks(content: &str) -> String {
@@ -887,18 +976,59 @@ fn hook_already_present(root: &serde_json::Value, hook_command: &str) -> bool {
         })
 }
 
-/// Default mode: hook + slim RTK.md + @RTK.md reference
+/// Default mode on Windows: native hook via `rtk hook claude` (no bash/jq needed)
 #[cfg(not(unix))]
 fn run_default_mode(
-    _global: bool,
-    _patch_mode: PatchMode,
-    _verbose: u8,
-    _install_opencode: bool,
+    global: bool,
+    patch_mode: PatchMode,
+    verbose: u8,
+    install_opencode: bool,
 ) -> Result<()> {
-    eprintln!("[warn] Hook-based mode requires Unix (macOS/Linux).");
-    eprintln!("    Windows: use --claude-md mode for full injection.");
-    eprintln!("    Falling back to --claude-md mode.");
-    run_claude_md_mode(_global, _verbose, _install_opencode)
+    if !global {
+        // Local init: inject CLAUDE.md
+        run_claude_md_mode(false, verbose, install_opencode)?;
+        return Ok(());
+    }
+
+    let claude_dir = resolve_claude_dir()?;
+    let rtk_md_path = claude_dir.join("RTK.md");
+    let claude_md_path = claude_dir.join("CLAUDE.md");
+
+    // 1. Write RTK.md
+    write_if_changed(&rtk_md_path, RTK_SLIM, "RTK.md", verbose)?;
+
+    // 2. Patch CLAUDE.md (add @RTK.md, migrate if needed)
+    let migrated = patch_claude_md(&claude_md_path, verbose)?;
+
+    // 3. Print success message
+    println!("\nRTK hook installed (global, native mode).\n");
+    println!("  RTK.md:    {} (10 lines)", rtk_md_path.display());
+    println!("  CLAUDE.md: @RTK.md reference added");
+
+    if migrated {
+        println!("\n  [ok] Migrated: removed 137-line RTK block from CLAUDE.md");
+        println!("              replaced with @RTK.md (10 lines)");
+    }
+
+    // 4. Patch settings.json with native hook command
+    let native_hook_command = "rtk hook claude";
+    let patch_result =
+        patch_settings_json_native(native_hook_command, patch_mode, verbose, install_opencode)?;
+
+    match patch_result {
+        PatchResult::Patched => {
+            // Already printed
+        }
+        PatchResult::AlreadyPresent => {
+            println!("\n  settings.json: hook already present");
+            println!("  Restart Claude Code. Test with: git status");
+        }
+        PatchResult::Declined | PatchResult::Skipped => {
+            // Manual instructions already printed
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -1034,15 +1164,35 @@ fn generate_global_filters_template(verbose: u8) -> Result<()> {
     Ok(())
 }
 
-/// Hook-only mode: just the hook, no RTK.md
+/// Hook-only mode on Windows: native hook via `rtk hook claude`
 #[cfg(not(unix))]
 fn run_hook_only_mode(
-    _global: bool,
-    _patch_mode: PatchMode,
-    _verbose: u8,
-    _install_opencode: bool,
+    global: bool,
+    patch_mode: PatchMode,
+    verbose: u8,
+    install_opencode: bool,
 ) -> Result<()> {
-    anyhow::bail!("Hook install requires Unix (macOS/Linux). Use WSL or --claude-md mode.")
+    if !global {
+        eprintln!("[warn] Warning: --hook-only only makes sense with --global");
+        return Ok(());
+    }
+
+    let native_hook_command = "rtk hook claude";
+    let patch_result =
+        patch_settings_json_native(native_hook_command, patch_mode, verbose, install_opencode)?;
+
+    println!("\nRTK hook installed (hook-only, native mode).\n");
+    match patch_result {
+        PatchResult::Patched => {
+            println!("  Restart Claude Code. Test with: git status");
+        }
+        PatchResult::AlreadyPresent => {
+            println!("  settings.json: hook already present");
+            println!("  Restart Claude Code. Test with: git status");
+        }
+        PatchResult::Declined | PatchResult::Skipped => {}
+    }
+    Ok(())
 }
 
 #[cfg(unix)]
