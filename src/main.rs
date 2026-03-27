@@ -2,6 +2,7 @@ mod analytics;
 mod cmds;
 mod core;
 mod discover;
+mod flutter_cmd;
 mod hooks;
 mod learn;
 mod parser;
@@ -231,6 +232,12 @@ enum Commands {
         /// All find arguments (supports both RTK and native find syntax)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
+    },
+
+    /// Flutter commands with compact output
+    Flutter {
+        #[command(subcommand)]
+        command: FlutterCommands,
     },
 
     /// Ultra-condensed diff (only changed lines)
@@ -1029,6 +1036,55 @@ enum GoCommands {
         args: Vec<String>,
     },
     /// Passthrough: runs any unsupported go subcommand directly
+    #[command(external_subcommand)]
+    Other(Vec<OsString>),
+}
+
+#[derive(Subcommand)]
+enum FlutterCommands {
+    /// Run tests with compact output (85-95% token reduction via JSON reporter)
+    Test {
+        /// Additional flutter test arguments
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Static analysis with grouped output (40-60% token reduction)
+    Analyze {
+        /// Additional flutter analyze arguments
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Build with compact output (70-85% token reduction)
+    Build {
+        /// Additional flutter build arguments (e.g., apk, web, windows)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Pub commands with compact output (get, outdated, deps)
+    Pub {
+        /// Pub subcommand and arguments
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Doctor with compact output (60-80% token reduction)
+    Doctor {
+        /// Additional flutter doctor arguments
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Clean with compact output -> "ok cleaned"
+    Clean {
+        /// Additional flutter clean arguments
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Create with compact output -> "ok <name> (N files)"
+    Create {
+        /// Project name and additional arguments
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Passthrough: runs any unsupported flutter subcommand directly
     #[command(external_subcommand)]
     Other(Vec<OsString>),
 }
@@ -1910,6 +1966,33 @@ fn run_cli() -> Result<i32> {
 
         Commands::Pip { args } => pip_cmd::run(&args, cli.verbose)?,
 
+        Commands::Flutter { command } => match command {
+            FlutterCommands::Test { args } => {
+                flutter_cmd::run_test(&args, cli.verbose)?;
+            }
+            FlutterCommands::Analyze { args } => {
+                flutter_cmd::run_analyze(&args, cli.verbose)?;
+            }
+            FlutterCommands::Build { args } => {
+                flutter_cmd::run_build(&args, cli.verbose)?;
+            }
+            FlutterCommands::Pub { args } => {
+                flutter_cmd::run_pub(&args, cli.verbose)?;
+            }
+            FlutterCommands::Doctor { args } => {
+                flutter_cmd::run_doctor(&args, cli.verbose)?;
+            }
+            FlutterCommands::Clean { args } => {
+                flutter_cmd::run_clean(&args, cli.verbose)?;
+            }
+            FlutterCommands::Create { args } => {
+                flutter_cmd::run_create(&args, cli.verbose)?;
+            }
+            FlutterCommands::Other(args) => {
+                flutter_cmd::run_other(&args, cli.verbose)?;
+            }
+        },
+
         Commands::Go { command } => match command {
             GoCommands::Test { args } => go_cmd::run_test(&args, cli.verbose)?,
             GoCommands::Build { args } => go_cmd::run_build(&args, cli.verbose)?,
@@ -2201,6 +2284,7 @@ fn is_operational_command(cmd: &Commands) -> bool {
             | Commands::Rubocop { .. }
             | Commands::Rspec { .. }
             | Commands::Pip { .. }
+            | Commands::Flutter { .. }
             | Commands::Go { .. }
             | Commands::GolangciLint { .. }
             | Commands::Gt { .. }

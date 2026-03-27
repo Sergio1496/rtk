@@ -11,6 +11,10 @@ Examples:
 ```bash
 rtk git status
 rtk cargo test
+rtk flutter test
+rtk flutter build apk
+rtk flutter analyze
+rtk flutter pub get
 rtk ls src/
 rtk grep "pattern" src/
 rtk find "*.rs" .

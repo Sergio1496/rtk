@@ -538,6 +538,14 @@ fn rewrite_segment(seg: &str, excluded: &[String]) -> Option<String> {
         return None;
     }
 
+    // flutter run is interactive (hot reload) — skip rewrite to avoid buffering.
+    if rule.rtk_cmd == "rtk flutter" {
+        let words: Vec<&str> = cmd_clean.split_whitespace().collect();
+        if words.len() >= 2 && words[1] == "run" {
+            return None;
+        }
+    }
+
     // #196: gh with --json/--jq/--template produces structured output that
     // rtk gh would corrupt — skip rewrite so the caller gets raw JSON.
     if rule.rtk_cmd == "rtk gh" {
@@ -607,6 +615,45 @@ mod tests {
                 category: "Git",
                 estimated_savings_pct: 80.0,
                 status: RtkStatus::Existing,
+            }
+        );
+    }
+
+    #[test]
+    fn test_classify_flutter_test() {
+        assert_eq!(
+            classify_command("flutter test"),
+            Classification::Supported {
+                rtk_equivalent: "rtk flutter",
+                category: "Flutter",
+                estimated_savings_pct: 90.0,
+                status: RtkStatus::Existing,
+            }
+        );
+    }
+
+    #[test]
+    fn test_classify_flutter_build() {
+        assert_eq!(
+            classify_command("flutter build apk"),
+            Classification::Supported {
+                rtk_equivalent: "rtk flutter",
+                category: "Flutter",
+                estimated_savings_pct: 80.0,
+                status: RtkStatus::Existing,
+            }
+        );
+    }
+
+    #[test]
+    fn test_classify_flutter_run_passthrough() {
+        assert_eq!(
+            classify_command("flutter run"),
+            Classification::Supported {
+                rtk_equivalent: "rtk flutter",
+                category: "Flutter",
+                estimated_savings_pct: 75.0,
+                status: RtkStatus::Passthrough,
             }
         );
     }
@@ -2341,8 +2388,6 @@ mod tests {
 
     #[test]
     fn test_classify_wc_supported() {
-        // BUG: "wc " was in IGNORED_PREFIXES despite wc_cmd.rs having a full filter.
-        // This test documents the bug: it must FAIL before the fix and PASS after.
         assert_eq!(
             classify_command("wc -l src/main.rs"),
             Classification::Supported {
@@ -2409,6 +2454,74 @@ mod tests {
         assert_eq!(
             split_command_chain("git log $(git rev-parse HEAD~1)"),
             vec!["git log $(git rev-parse HEAD~1)"]
+        );
+    }
+
+    // --- Flutter rewrite ---
+
+    #[test]
+    fn test_rewrite_flutter_test() {
+        assert_eq!(
+            rewrite_command("flutter test", &[]),
+            Some("rtk flutter test".into())
+        );
+    }
+
+    #[test]
+    fn test_rewrite_flutter_test_with_args() {
+        assert_eq!(
+            rewrite_command("flutter test test/widget_test.dart", &[]),
+            Some("rtk flutter test test/widget_test.dart".into())
+        );
+    }
+
+    #[test]
+    fn test_rewrite_flutter_analyze() {
+        assert_eq!(
+            rewrite_command("flutter analyze", &[]),
+            Some("rtk flutter analyze".into())
+        );
+    }
+
+    #[test]
+    fn test_rewrite_flutter_build_apk() {
+        assert_eq!(
+            rewrite_command("flutter build apk", &[]),
+            Some("rtk flutter build apk".into())
+        );
+    }
+
+    #[test]
+    fn test_rewrite_flutter_pub_get() {
+        assert_eq!(
+            rewrite_command("flutter pub get", &[]),
+            Some("rtk flutter pub get".into())
+        );
+    }
+
+    #[test]
+    fn test_rewrite_flutter_run_skipped() {
+        assert_eq!(rewrite_command("flutter run", &[]), None);
+    }
+
+    #[test]
+    fn test_rewrite_flutter_run_with_args_skipped() {
+        assert_eq!(rewrite_command("flutter run -d chrome", &[]), None);
+    }
+
+    #[test]
+    fn test_rewrite_flutter_doctor() {
+        assert_eq!(
+            rewrite_command("flutter doctor", &[]),
+            Some("rtk flutter doctor".into())
+        );
+    }
+
+    #[test]
+    fn test_rewrite_flutter_clean() {
+        assert_eq!(
+            rewrite_command("flutter clean", &[]),
+            Some("rtk flutter clean".into())
         );
     }
 }

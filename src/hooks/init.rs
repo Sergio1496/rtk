@@ -114,6 +114,7 @@ rtk next build          # Next.js build with route metrics (87%)
 rtk cargo test          # Cargo test failures only (90%)
 rtk vitest run          # Vitest failures only (99.5%)
 rtk playwright test     # Playwright failures only (94%)
+rtk flutter test        # Flutter test failures only (85-95%)
 rtk test <cmd>          # Generic test wrapper - failures only
 ```
 
@@ -153,6 +154,22 @@ rtk npm run <script>    # Compact npm script output
 rtk npx <cmd>           # Compact npx command output
 rtk prisma              # Prisma without ASCII art (88%)
 ```
+
+### Flutter (75-90% savings)
+```bash
+rtk flutter test        # Test failures only via JSON reporter (85-95%)
+rtk flutter analyze     # Issues grouped by severity (40-60%)
+rtk flutter build web   # Compact result: "ok build/web (18s)" (70-85%)
+rtk flutter build apk   # Compact result: "ok app-release.apk (40MB)" (70-85%)
+rtk flutter pub get     # Compact: "ok 27 deps (6 upgradable)" (80-90%)
+rtk flutter pub outdated # Only packages with updates (30-50%)
+rtk flutter pub deps    # Top-level dependencies only (70-90%)
+rtk flutter doctor      # Compact: "ok (7/7 passed)" or issues only (60-80%)
+rtk flutter clean       # Compact: "ok cleaned" (80%)
+rtk flutter create      # Compact: "ok myapp (130 files)" (90%)
+```
+
+Note: `flutter run` is interactive and NOT rewritten — it passes through directly.
 
 ### Files & Search (60-75% savings)
 ```bash
@@ -202,11 +219,12 @@ rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
 
 | Category | Commands | Typical Savings |
 |----------|----------|-----------------|
-| Tests | vitest, playwright, cargo test | 90-99% |
-| Build | next, tsc, lint, prettier | 70-87% |
+| Tests | vitest, playwright, cargo test, flutter test | 85-99% |
+| Build | next, tsc, lint, prettier, flutter build | 70-87% |
+| Flutter | test, analyze, build, pub, doctor, clean | 75-90% |
 | Git | status, log, diff, add, commit | 59-80% |
 | GitHub | gh pr, gh run, gh issue | 26-87% |
-| Package Managers | pnpm, npm, npx | 70-90% |
+| Package Managers | pnpm, npm, npx, flutter pub | 70-90% |
 | Files | ls, read, grep, find | 60-75% |
 | Infrastructure | docker, kubectl | 85% |
 | Network | curl, wget | 65-70% |
@@ -2357,6 +2375,10 @@ Always prefix shell commands with `rtk`:
 git status                 rtk git status
 git log -10                rtk git log -10
 cargo test                 rtk cargo test
+flutter test               rtk flutter test
+flutter build apk          rtk flutter build apk
+flutter analyze            rtk flutter analyze
+flutter pub get            rtk flutter pub get
 docker ps                  rtk docker ps
 kubectl get pods           rtk kubectl pods
 ```

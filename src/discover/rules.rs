@@ -266,6 +266,25 @@ pub const RULES: &[RtkRule] = &[
         subcmd_savings: &[("list", 75.0), ("outdated", 80.0)],
         subcmd_status: &[],
     },
+    // Flutter tooling
+    RtkRule {
+        pattern: r"^flutter\s+(test|analyze|build|pub|doctor|clean|create|run)",
+        rtk_cmd: "rtk flutter",
+        rewrite_prefixes: &["flutter"],
+        category: "Flutter",
+        savings_pct: 75.0,
+        subcmd_savings: &[
+            ("test", 90.0),
+            ("analyze", 50.0),
+            ("build", 80.0),
+            ("pub", 80.0),
+            ("doctor", 70.0),
+            ("clean", 80.0),
+            ("create", 90.0),
+        ],
+        subcmd_status: &[("run", RtkStatus::Passthrough)],
+    },
+    // Go tooling
     RtkRule {
         pattern: r"^go\s+(test|build|vet)",
         rtk_cmd: "rtk go",
