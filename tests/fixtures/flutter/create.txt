@@ -1,0 +1,15 @@
+Creating project ..\rtk_create_fixture...
+Wrote 130 files.
+
+All done!
+You can find general documentation for Flutter at: https://docs.flutter.dev/
+Detailed API documentation is available at: https://api.flutter.dev/
+If you prefer video documentation, consider: https://www.youtube.com/c/flutterdev
+
+In order to run your application, type:
+
+  $ cd ..\rtk_create_fixture
+  $ flutter run
+
+Your application code is in ..\rtk_create_fixture\lib\main.dart.
+

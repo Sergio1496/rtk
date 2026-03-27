@@ -1,0 +1,10 @@
+Doctor summary (to see all details, run flutter doctor -v):
+[√] Flutter (Channel stable, 3.38.3, on Microsoft Windows [Versi¢n 10.0.26200.8037], locale es-ES)
+[√] Windows Version (11 Home 64-bit, 25H2, 2009)
+[√] Android toolchain - develop for Android devices (Android SDK version 36.1.0)
+[√] Chrome - develop for the web
+[√] Visual Studio - develop Windows apps (Visual Studio Build Tools 2026 18.2.0)
+[√] Connected device (4 available)
+[√] Network resources
+
+• No issues found!

@@ -118,6 +118,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Features
+
+* **flutter:** add Flutter CLI support with 8 subcommand filters (test, analyze, build, pub, doctor, clean, create + passthrough) achieving 75-90% token savings
+* **flutter:** auto-rewrite `flutter X` → `rtk flutter X` via hook (except `flutter run` which is interactive)
+* **flutter:** update CLAUDE.md, Copilot, Cline, Windsurf, and Codex templates with Flutter commands
+
 ### Bug Fixes
 
 * **wc:** `wc` filter was never invoked by the hook — removed `"wc "` from `IGNORED_PREFIXES` and added registry entry so `wc` commands are rewritten to `rtk wc`

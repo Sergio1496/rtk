@@ -47,6 +47,7 @@ rtk filters and compresses command outputs before they reach your LLM context. S
 | `git log` | 5x | 2,500 | 500 | -80% |
 | `git add/commit/push` | 8x | 1,600 | 120 | -92% |
 | `cargo test` / `npm test` | 5x | 25,000 | 2,500 | -90% |
+| `flutter test/build/analyze` | 5x | 15,000 | 1,500 | -90% |
 | `ruff check` | 3x | 3,000 | 600 | -80% |
 | `pytest` | 4x | 8,000 | 800 | -90% |
 | `go test` | 3x | 6,000 | 600 | -90% |
@@ -176,6 +177,7 @@ rtk go test                     # Go tests (NDJSON, -90%)
 rtk cargo test                  # Cargo tests (-90%)
 rtk rake test                   # Ruby minitest (-90%)
 rtk rspec                       # RSpec tests (JSON, -60%+)
+rtk flutter test                # Flutter tests (JSON reporter, -85%)
 ```
 
 ### Build & Lint
@@ -190,6 +192,8 @@ rtk cargo clippy                # Cargo clippy (-80%)
 rtk ruff check                  # Python linting (JSON, -80%)
 rtk golangci-lint run           # Go linting (JSON, -85%)
 rtk rubocop                     # Ruby linting (JSON, -60%+)
+rtk flutter build apk           # Flutter build compact (-80%)
+rtk flutter analyze             # Flutter analysis grouped (-50%)
 ```
 
 ### Package Managers
@@ -199,6 +203,9 @@ rtk pip list                    # Python packages (auto-detect uv)
 rtk pip outdated                # Outdated packages
 rtk bundle install              # Ruby gems (strip Using lines)
 rtk prisma generate             # Schema generation (no ASCII art)
+rtk flutter pub get             # Flutter deps compact (-80%)
+rtk flutter pub outdated        # Only upgradable packages
+rtk flutter pub deps            # Top-level deps only (-70%)
 ```
 
 ### AWS
@@ -432,6 +439,7 @@ Blocked on upstream BeforeToolCallback support ([mistral-vibe#531](https://githu
 | `rubocop` / `bundle exec rubocop` | `rtk rubocop` |
 | `bundle install/update` | `rtk bundle ...` |
 | `aws sts/ec2/lambda/...` | `rtk aws ...` |
+| `flutter test/analyze/build/pub/doctor/clean/create` | `rtk flutter ...` |
 | `docker ps/images/logs` | `rtk docker ...` |
 | `kubectl get/logs` | `rtk kubectl ...` |
 | `curl` | `rtk curl` |

@@ -1,0 +1,12 @@
+Analyzing rtk_fixture_project...                                
+
+warning - Unused import: 'dart:io' - lib\bad_code.dart:1:8 - unused_import
+warning - Unused import: 'dart:convert' - lib\bad_code.dart:2:8 - unused_import
+  error - Non-nullable instance field 'name' must be initialized - lib\bad_code.dart:5:10 - not_initialized_non_nullable_instance_field
+   info - The variable name 'unused_variable' isn't a lowerCamelCase identifier - lib\bad_code.dart:6:7 - non_constant_identifier_names
+   info - Don't invoke 'print' in production code - lib\bad_code.dart:10:5 - avoid_print
+warning - The value of the local variable 'y' isn't used - lib\bad_code.dart:11:9 - unused_local_variable
+   info - Function literals shouldn't be passed to 'forEach' - lib\bad_code.dart:16:11 - avoid_function_literals_in_foreach_calls
+   info - Don't invoke 'print' in production code - lib\bad_code.dart:17:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\bad_code.dart:24:3 - avoid_print
+
