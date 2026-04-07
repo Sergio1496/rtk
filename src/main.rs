@@ -2,7 +2,6 @@ mod analytics;
 mod cmds;
 mod core;
 mod discover;
-mod flutter_cmd;
 mod hooks;
 mod learn;
 mod parser;
@@ -10,6 +9,7 @@ mod parser;
 // Re-export command modules for routing
 use cmds::cloud::{aws_cmd, container, curl_cmd, psql_cmd, wget_cmd};
 use cmds::dotnet::{binlog, dotnet_cmd, dotnet_format_report, dotnet_trx};
+use cmds::flutter::flutter_cmd;
 use cmds::git::{diff_cmd, gh_cmd, git, gt_cmd};
 use cmds::go::{go_cmd, golangci_cmd};
 use cmds::js::{
@@ -1968,32 +1968,35 @@ fn run_cli() -> Result<i32> {
 
         Commands::Pip { args } => pip_cmd::run(&args, cli.verbose)?,
 
-        Commands::Flutter { command } => match command {
-            FlutterCommands::Test { args } => {
-                flutter_cmd::run_test(&args, cli.verbose)?;
+        Commands::Flutter { command } => {
+            match command {
+                FlutterCommands::Test { args } => {
+                    flutter_cmd::run_test(&args, cli.verbose)?;
+                }
+                FlutterCommands::Analyze { args } => {
+                    flutter_cmd::run_analyze(&args, cli.verbose)?;
+                }
+                FlutterCommands::Build { args } => {
+                    flutter_cmd::run_build(&args, cli.verbose)?;
+                }
+                FlutterCommands::Pub { args } => {
+                    flutter_cmd::run_pub(&args, cli.verbose)?;
+                }
+                FlutterCommands::Doctor { args } => {
+                    flutter_cmd::run_doctor(&args, cli.verbose)?;
+                }
+                FlutterCommands::Clean { args } => {
+                    flutter_cmd::run_clean(&args, cli.verbose)?;
+                }
+                FlutterCommands::Create { args } => {
+                    flutter_cmd::run_create(&args, cli.verbose)?;
+                }
+                FlutterCommands::Other(args) => {
+                    flutter_cmd::run_other(&args, cli.verbose)?;
+                }
             }
-            FlutterCommands::Analyze { args } => {
-                flutter_cmd::run_analyze(&args, cli.verbose)?;
-            }
-            FlutterCommands::Build { args } => {
-                flutter_cmd::run_build(&args, cli.verbose)?;
-            }
-            FlutterCommands::Pub { args } => {
-                flutter_cmd::run_pub(&args, cli.verbose)?;
-            }
-            FlutterCommands::Doctor { args } => {
-                flutter_cmd::run_doctor(&args, cli.verbose)?;
-            }
-            FlutterCommands::Clean { args } => {
-                flutter_cmd::run_clean(&args, cli.verbose)?;
-            }
-            FlutterCommands::Create { args } => {
-                flutter_cmd::run_create(&args, cli.verbose)?;
-            }
-            FlutterCommands::Other(args) => {
-                flutter_cmd::run_other(&args, cli.verbose)?;
-            }
-        },
+            0
+        }
 
         Commands::Go { command } => match command {
             GoCommands::Test { args } => go_cmd::run_test(&args, cli.verbose)?,
@@ -2023,7 +2026,6 @@ fn run_cli() -> Result<i32> {
             match command {
                 HookCommands::Gemini => hooks::hook_cmd::run_gemini()?,
                 HookCommands::Copilot => hooks::hook_cmd::run_copilot()?,
-            }
                 HookCommands::Claude => hooks::hook_cmd::run_claude()?,
             }
             0

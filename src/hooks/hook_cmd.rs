@@ -204,12 +204,12 @@ pub fn run_claude() -> Result<()> {
     };
 
     // Check deny/ask via permissions system
-    let verdict = crate::permissions::check_command(cmd);
-    if verdict == crate::permissions::PermissionVerdict::Deny {
+    let verdict = crate::hooks::permissions::check_command(cmd);
+    if verdict == crate::hooks::permissions::PermissionVerdict::Deny {
         return Ok(()); // Let Claude Code's native deny handle it
     }
 
-    if verdict == crate::permissions::PermissionVerdict::Ask {
+    if verdict == crate::hooks::permissions::PermissionVerdict::Ask {
         // Rewrite but don't auto-allow — let Claude Code prompt the user
         let output = json!({
             "hookSpecificOutput": {
